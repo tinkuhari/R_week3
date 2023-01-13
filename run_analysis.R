@@ -1,51 +1,47 @@
 library(dplyr)
 
-#Read feature data used for training and testing
+#Read training set and test set
 train_data <- read.table("./UCI HAR Dataset/train/X_train.txt")
 test_data <- read.table("./UCI HAR Dataset/test/X_test.txt")
 
-#Read activity and subject details used to generate feature data
+#Read activity id and subject id details of training set and test set
 train_activities <- read.table("./UCI HAR Dataset/train/y_train.txt")
 train_subjects <- read.table("./UCI HAR Dataset/train/subject_train.txt")
 test_activities <- read.table("./UCI HAR Dataset/test/y_test.txt")
 test_subjects <- read.table("./UCI HAR Dataset/test/subject_test.txt")
 
 #Read activity and feature labels
-activity_labels <- read.table("./UCI HAR Dataset/activity_labels.txt")
+activity_labels <- read.table("./UCI HAR Dataset/activity_labels.txt",col.names = c("activityId","activityName"))
 features <- read.table("./UCI HAR Dataset/features.txt")
 
-#Merge activity and subject data used in training to training feature data
-train_data$subject <- train_subjects$V1
-train_data$activity <- train_activities$V1
+#Add activity id, subject id columns to training set.
+train_data <- cbind(subjectId=train_subjects$V1,activityId=train_activities$V1,train_data)
 
-#Merge activity and subject data used in training to training feature data
-test_data$subject <- test_subjects$V1
-test_data$activity <- test_activities$V1
+#Add activity id, subject id columns to test set.
+test_data <- cbind(subjectId=test_subjects$V1,activityId=test_activities$V1,test_data)
 
-#Merge training and testing datasets. This dataset contain feature data, subject id,activity id
-combined_data <- union(train_data,test_data)
+#Merge training and testing sets and add column names for all variables
+merged_train_test_data <- union(train_data,test_data)
+names(merged_train_test_data)[-c(1:2)] <- features$V2 
 
+#Tidy up the merged dataset by adding activity labels
 #Add activity labels to each row by merging the combined data set with activity label dataset 
-
-data_withlabels <- merge(activity_labels,combined_data,by.x="V1",by.y="activity")
-
-#Add column names
-
-names(data_withlabels)[1:2] <- c("activity_id","activity_name")#update column names of activity id and name
-names(data_withlabels)[3:563] <- features$V2 #Add descriptive names for all 560 variable name
-names(data_withlabels)[564] <- "subject"
+tidy_merged_data <- merge(activity_labels,merged_train_test_data,by="activityId")
 
 
+###Extract required variables and summarize the extracted data
 
-#Extract mean and standard deviation data for each activity and subject
+#1. Extract mean and standard deviation data for each activity and subject
+mean_std_data <- tidy_merged_data %>%
+                 select(subjectId,activityName,contains("mean()")|contains("std()"))
 
-tidy_data1 <- data_withlabels %>%
-  select(subject,activity_name,contains("mean()")|contains("std()"))
+#2. create a tidy data set with average for each mean() and std() variable for each activity and subject
+average_mean_std_data <- mean_std_data %>%
+                         group_by(subjectId,activityName)%>%
+                         summarise_all(mean)
 
-#create data set with average for each mean and std variable for each activity and subject
-tidy_data2 <- tidy_data1 %>%
-  group_by(subject,activity_name)%>%
-  summarise_all(mean)
+#3.Rename the variable column to indicate the data represents average of mean() or std()
+names(average_mean_std_data)[-c(1:2)] <- paste0("Average_",names(average_mean_std_data)[-c(1:2)])
 
-#View tidy dataset2
-View(head(tidy_data2))
+###write summarized data to file
+write.table(average_mean_std_data,file="./tidy_dataset.txt")
