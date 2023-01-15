@@ -47,4 +47,4 @@ average_mean_std_data <- mean_std_data %>%
 names(average_mean_std_data)[-c(1:2)] <- paste0("Average_",names(average_mean_std_data)[-c(1:2)])
 
 ###write summarized data to file###
-write.table(average_mean_std_data,file="./tidy_dataset.txt")
+write.table(average_mean_std_data,file="./tidy_dataset.txt",row.names = FALSE)
